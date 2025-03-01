@@ -13,10 +13,6 @@ from discord.ui import Select, View
 from typing import Optional, List, Dict
 from dataclasses import dataclass, field
 
-
-
-
-
 # Configuration class for better organization
 @dataclass
 class BotConfig:
