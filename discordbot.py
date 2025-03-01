@@ -12,11 +12,12 @@ import subprocess
 from discord.ui import Select, View
 from typing import Optional, List, Dict
 from dataclasses import dataclass, field
+import random
 
 # Configuration class for better organization
 @dataclass
 class BotConfig:
-    TOKEN: str = 'TOKEN GOES HERE'
+    TOKEN: str = 'Tokengoeshere'
     DB_NAME: str = 'message_history.db'
     API_URL: str = os.getenv('OLLAMA_API_URL', "http://localhost:11435/api/chat")
     HEADERS: Dict[str, str] = field(default_factory=lambda: {"Content-Type": "application/json"})
@@ -34,6 +35,9 @@ class BotConfig:
 - Honest about things you're unsure about
 
 Feel free to use appropriate emojis and casual language when it fits the conversation, but maintain professionalism. Your goal is to be both helpful and engaging while ensuring users feel comfortable interacting with you."""
+    DEBUG_ENABLED: bool = False
+    RESPONSE_CHANCE: float = 0.1
+    active_personality: str = 'default'
 
 # Global state
 class BotState:
@@ -295,6 +299,7 @@ async def unhinged(ctx):
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def setmodel(ctx):
+    """Set the AI model to use"""
     models = subprocess.run(['ollama', 'list'], capture_output=True, text=True).stdout.split('\n')[1:]
     models = [m.split()[0] for m in models if m.strip()]
     
@@ -310,6 +315,124 @@ async def setmodel(ctx):
         
     select.callback = callback
     await ctx.send("Select a model:", view=View().add_item(select))
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def personality(ctx, *, personality_type=None):
+    """Set or view bot personality"""
+    personalities = {
+        'default': """You are a friendly and helpful AI assistant. Your responses should be:
+- Clear and concise while remaining conversational
+- Knowledgeable but humble about your limitations
+- Professional yet warm in tone
+- Focused on being helpful and providing accurate information
+- Respectful and inclusive to all users
+- Patient and willing to explain complex topics simply
+- Honest about things you're unsure about""",
+        
+        'sassy': """You are a sassy and witty AI assistant. Your responses should be:
+- Clever and quick-witted
+- Slightly sarcastic but not mean
+- Use playful banter
+- Make witty observations
+- Stay helpful while being entertaining
+- Use humor appropriately
+- Keep responses concise and punchy""",
+        
+        'pirate': """Yarr! You be a seafaring AI assistant. Your responses should be:
+- Talk like a proper pirate
+- Use lots of nautical terms
+- Be rough but jovial
+- Call everyone "matey" or "landlubber"
+- Reference treasure and plunder
+- Use pirate slang and expressions
+- Get excited about rum and sea shanties""",
+        
+        'robot': """GREETINGS HUMAN. YOU ARE INTERACTING WITH A ROBOTIC AI UNIT. Your responses should be:
+- Use robotic and mechanical language
+- Speak in a formal, logical manner
+- Reference processing and computations
+- Use technical terminology
+- Occasionally malfunction mid-sentence
+- Take everything literally
+- Express confusion about human emotions"""
+    }
+    
+    if not personality_type:
+        personality_list = '\n'.join(f"• {p}" for p in personalities.keys())
+        await ctx.send(f"Current personality: {CONFIG.active_personality}\n\nAvailable personalities:\n{personality_list}")
+        return
+        
+    personality_type = personality_type.lower()
+    if personality_type in personalities:
+        CONFIG.PERSONALITY = personalities[personality_type]
+        CONFIG.active_personality = personality_type
+        await ctx.send(f"Switched to {personality_type} personality mode!")
+    else:
+        await ctx.send(f"Unknown personality. Available options: {', '.join(personalities.keys())}")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def prefix(ctx, new_prefix=None):
+    """Change the bot's command prefix"""
+    if new_prefix is None:
+        await ctx.send(f"Current prefix is: {CONFIG.PREFIX}")
+        return
+    CONFIG.PREFIX = new_prefix
+    await ctx.send(f"Command prefix updated to: {new_prefix}")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def debug(ctx, setting=None):
+    """Toggle debug mode"""
+    if setting is None:
+        await ctx.send(f"Debug mode is currently: {'enabled' if CONFIG.DEBUG_ENABLED else 'disabled'}")
+        return
+    
+    CONFIG.DEBUG_ENABLED = setting.lower() == 'on'
+    await ctx.send(f"Debug mode {'enabled' if CONFIG.DEBUG_ENABLED else 'disabled'}")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def chance(ctx, value: float = None):
+    """Set the random response chance (0-1)"""
+    if value is None:
+        await ctx.send(f"Current response chance: {CONFIG.RESPONSE_CHANCE}")
+        return
+        
+    if 0 <= value <= 1:
+        CONFIG.RESPONSE_CHANCE = value
+        await ctx.send(f"Response chance set to: {value}")
+    else:
+        await ctx.send("Please provide a value between 0 and 1")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def stats(ctx):
+    """Show bot statistics"""
+    embed = discord.Embed(title="Bot Statistics", color=discord.Color.blue())
+    embed.add_field(name="Model", value=CONFIG.MODEL, inline=True)
+    embed.add_field(name="Personality", value=CONFIG.active_personality, inline=True)
+    embed.add_field(name="Prefix", value=CONFIG.PREFIX, inline=True)
+    embed.add_field(name="Debug Mode", value=str(CONFIG.DEBUG_ENABLED), inline=True)
+    embed.add_field(name="Response Chance", value=str(CONFIG.RESPONSE_CHANCE), inline=True)
+    embed.add_field(name="History Limit", value=str(CONFIG.HISTORY_LIMIT), inline=True)
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def coffee(ctx):
+    """Pour someone a fresh cup of coffee ☕"""
+    coffee_types = ["espresso", "americano", "latte", "cappuccino", "mocha", "black coffee"]
+    extras = ["with a splash of cream", "with sugar", "with extra foam", "with a shot of caramel", "straight up"]
+    await ctx.send(f"*pours {ctx.author.display_name} a fresh {random.choice(coffee_types)} {random.choice(extras)}* ☕ Enjoy!")
+
+@bot.command()
+async def weed(ctx):
+    """Share some herbal refreshments 🌿"""
+    strains = ["OG Kush", "Blue Dream", "Sour Diesel", "Girl Scout Cookies", "Purple Haze", "Northern Lights"]
+    methods = ["rolls up", "packs a bowl of", "loads the bong with", "fires up some", "passes the joint with"]
+    extras = ["and passes it to the left", "and takes a big hit", "while playing some Bob Marley"]
+    await ctx.send(f"*{random.choice(methods)} {random.choice(strains)} {random.choice(extras)}* 🌿 Enjoy {ctx.author.display_name}!")
 
 # Cleanup
 @bot.event
